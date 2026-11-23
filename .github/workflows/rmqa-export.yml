@@ -51,6 +51,7 @@ jobs:
       - name: 上传答疑 JSON
         uses: actions/upload-artifact@v7
         with:
+          archive: false
           name: rmqa-2027
           path: out/rmqa_2027_clean.json
           if-no-files-found: error
