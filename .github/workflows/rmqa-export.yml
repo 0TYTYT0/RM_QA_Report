@@ -1,0 +1,55 @@
+name: 导出 RoboMaster 答疑
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 9 * * *"
+      timezone: Asia/Shanghai
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        if: ${{ hashFiles('requirements.txt') != '' }}
+        run: python -m pip install -r requirements.txt
+
+      - name: 导出并验证 JSON
+        run: |
+          python -u export_rmqa.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          records = json.loads(
+              Path("rmqa_2027_clean.json").read_text(encoding="utf-8")
+          )
+          expected = {"id", "university", "team", "competition", "question", "answer"}
+
+          if not isinstance(records, list) or not records:
+              raise SystemExit("导出结果应为非空 JSON 列表")
+
+          for index, record in enumerate(records, start=1):
+              if not isinstance(record, dict) or set(record) != expected:
+                  raise SystemExit(f"第 {index} 条记录的字段不符合预期")
+
+          print(f"已验证 {len(records)} 条答疑记录")
+          PY
+
+      - name: 上传答疑 JSON
+        uses: actions/upload-artifact@v7
+        with:
+          name: rmqa-2027
+          path: rmqa_2027_clean.json
+          if-no-files-found: error
