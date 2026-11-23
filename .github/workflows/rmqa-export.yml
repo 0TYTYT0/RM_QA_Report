@@ -1,4 +1,4 @@
-name: 导出 RoboMaster 答疑
+name: 导出并总结 RoboMaster 答疑
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   export:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v7
@@ -54,4 +54,49 @@ jobs:
           archive: false
           name: rmqa-2027
           path: out/rmqa_2027_clean.json
+          if-no-files-found: error
+
+      - name: 校验快照并生成差异
+        run: |
+          python -u scripts/prepare_rmqa.py \
+            --current out/rmqa_2027_clean.json \
+            --published data/rmqa_2027_published.json \
+            --output-dir out/report
+
+      - name: 生成 Markdown 报告
+        env:
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+          DASHSCOPE_BASE_URL: ${{ vars.DASHSCOPE_BASE_URL }}
+        shell: python
+        run: |
+          import subprocess
+          import sys
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          output_dir = Path("out/report")
+          date = datetime.now(timezone(timedelta(hours=8))).date().isoformat()
+          report = output_dir / f"{date}.md"
+          if (output_dir / "model_input.txt").stat().st_size:
+              subprocess.run([
+                  sys.executable, "-u", "scripts/summarize_rmqa.py",
+                  "--changes", str(output_dir / "changes.json"),
+                  "--output-dir", str(output_dir),
+                  "--date", date,
+              ], check=True)
+          else:
+              report.write_text(
+                  f"# {date} RMUC/UL 规则答疑总结\n\n本次没有答疑变更。\n",
+                  encoding="utf-8",
+              )
+          if not report.is_file() or not report.stat().st_size:
+              raise SystemExit("Markdown 报告缺失或为空")
+
+      - name: 上传原始差异和报告
+        uses: actions/upload-artifact@v7
+        with:
+          name: rmqa-report
+          path: |
+            out/report/changes.json
+            out/report/*.md
           if-no-files-found: error
