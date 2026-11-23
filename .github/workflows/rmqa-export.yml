@@ -27,13 +27,14 @@ jobs:
 
       - name: 导出并验证 JSON
         run: |
+          mkdir -p out
           python -u main.py
           python - <<'PY'
           import json
           from pathlib import Path
 
           records = json.loads(
-              Path("rmqa_2027_clean.json").read_text(encoding="utf-8")
+              Path("out/rmqa_2027_clean.json").read_text(encoding="utf-8")
           )
           expected = {"id", "university", "team", "competition", "question", "answer"}
 
@@ -51,5 +52,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: rmqa-2027
-          path: rmqa_2027_clean.json
+          path: out/rmqa_2027_clean.json
           if-no-files-found: error
