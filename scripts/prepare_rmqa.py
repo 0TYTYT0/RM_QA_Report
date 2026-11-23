@@ -23,7 +23,7 @@ def load_export(path, *, allow_empty=False):
     return snapshot
 
 
-def render_model_input(changes, template_path):
+def model_input_parts(changes, template_path):
     template = template_path.read_text(encoding="utf-8")
     if template.count(PLACEHOLDER) != 1:
         raise ValueError(f"{template_path} 必须包含一个变更数据占位符")
@@ -36,7 +36,12 @@ def render_model_input(changes, template_path):
         for category, records in changes.items()
         if records
     }
-    return template.replace(PLACEHOLDER, json.dumps(model_data, ensure_ascii=False, indent=2))
+    before, _, after = template.partition(PLACEHOLDER)
+    return before, json.dumps(model_data, ensure_ascii=False, indent=2), after
+
+
+def render_model_input(changes, template_path):
+    return "".join(model_input_parts(changes, template_path))
 
 
 def main():
