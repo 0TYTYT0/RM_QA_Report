@@ -27,7 +27,7 @@ jobs:
 
       - name: 导出并验证 JSON
         run: |
-          python -u export_rmqa.py
+          python -u main.py
           python - <<'PY'
           import json
           from pathlib import Path
