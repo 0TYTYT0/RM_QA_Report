@@ -22,7 +22,7 @@ $python = '.\.venv\Scripts\python.exe'
 
 ```powershell
 New-Item -ItemType Directory -Path out -Force | Out-Null
-& $python -X utf8 main.py
+& $python -X utf8 scripts/export_rmqa.py
 if ($LASTEXITCODE -ne 0) { throw '答疑导出失败' }
 
 & $python -X utf8 scripts/prepare_rmqa.py
