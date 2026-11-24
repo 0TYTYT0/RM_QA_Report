@@ -3,19 +3,29 @@ name: 导出并总结 RoboMaster 答疑
 on:
   workflow_dispatch:
   schedule:
-    - cron: "15 9 * * *"
+    - cron: "0 8 * * 1"
       timezone: Asia/Shanghai
 
 permissions:
   contents: read
 
+concurrency:
+  group: rmqa-export-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   export:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    outputs:
+      has-changes: ${{ steps.report.outputs.has-changes }}
+      report-date: ${{ steps.report.outputs.report-date }}
+      baseline-hash: ${{ steps.report.outputs.baseline-hash }}
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v7
         with:
@@ -64,11 +74,14 @@ jobs:
             --output-dir out/report
 
       - name: 生成 Markdown 报告
+        id: report
         env:
           DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
           DASHSCOPE_BASE_URL: ${{ vars.DASHSCOPE_BASE_URL }}
         shell: python
         run: |
+          import hashlib
+          import os
           import subprocess
           import sys
           from datetime import datetime, timedelta, timezone
@@ -77,7 +90,8 @@ jobs:
           output_dir = Path("out/report")
           date = datetime.now(timezone(timedelta(hours=8))).date().isoformat()
           report = output_dir / f"{date}.md"
-          if (output_dir / "model_input.txt").stat().st_size:
+          has_changes = (output_dir / "model_input.txt").stat().st_size > 0
+          if has_changes:
               subprocess.run([
                   sys.executable, "-u", "scripts/summarize_rmqa.py",
                   "--changes", str(output_dir / "changes.json"),
@@ -91,6 +105,11 @@ jobs:
               )
           if not report.is_file() or not report.stat().st_size:
               raise SystemExit("Markdown 报告缺失或为空")
+          baseline = Path("data/rmqa_2027_published.json").read_bytes()
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as outputs:
+              print(f"has-changes={str(has_changes).lower()}", file=outputs)
+              print(f"report-date={date}", file=outputs)
+              print(f"baseline-hash={hashlib.sha256(baseline).hexdigest()}", file=outputs)
 
       - name: 上传原始差异和报告
         uses: actions/upload-artifact@v7
@@ -100,3 +119,74 @@ jobs:
             out/report/changes.json
             out/report/*.md
           if-no-files-found: error
+
+  propose-publication:
+    needs: export
+    if: ${{ needs.export.outputs.has-changes == 'true' && github.ref_name == github.event.repository.default_branch }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: 获取本轮快照
+        uses: actions/download-artifact@v8
+        with:
+          name: rmqa_2027_clean.json
+          path: out/publication/snapshot
+
+      - name: 获取本轮报告
+        uses: actions/download-artifact@v8
+        with:
+          name: rmqa-report
+          path: out/publication/report
+
+      - name: 核对基线并准备提交
+        id: publication
+        env:
+          BASELINE_HASH: ${{ needs.export.outputs.baseline-hash }}
+          REPORT_DATE: ${{ needs.export.outputs.report-date }}
+        shell: python
+        run: |
+          import hashlib
+          import os
+          from pathlib import Path
+          from shutil import copyfile
+
+          baseline = Path("data/rmqa_2027_published.json")
+          if hashlib.sha256(baseline.read_bytes()).hexdigest() != os.environ["BASELINE_HASH"]:
+              raise SystemExit("默认分支的发布基线已更新，请重新运行工作流")
+
+          date = os.environ["REPORT_DATE"]
+          source = Path("out/publication/report") / f"{date}.md"
+          report = Path("reports") / source.name
+          if report.exists():
+              report = report.with_stem(f"{date}-{os.environ['GITHUB_RUN_ID']}")
+
+          copyfile("out/publication/snapshot/rmqa_2027_clean.json", baseline)
+          copyfile(source, report)
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as outputs:
+              print(f"report-path={report.as_posix()}", file=outputs)
+
+      - name: 创建或更新发布 PR
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: automation/rmqa-publication
+          base: ${{ github.event.repository.default_branch }}
+          delete-branch: true
+          title: 发布 RoboMaster 答疑报告（${{ needs.export.outputs.report-date }}）
+          commit-message: 更新 RoboMaster 答疑报告与发布基线
+          body: |
+            本 PR 提交本轮答疑报告和生成报告时对应的完整快照。
+            请审核报告内容，确认后合并以推进发布基线。
+
+            工作流运行：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          add-paths: |
+            data/rmqa_2027_published.json
+            ${{ steps.publication.outputs.report-path }}
