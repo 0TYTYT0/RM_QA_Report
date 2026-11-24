@@ -1,5 +1,7 @@
 # RMUC/UL 2027 答疑更新
 
+**最新报告** [2026-11-24 答疑报告](reports/2026-11-24.md) <!-- rmqa-latest-report -->
+
 从轻流共享视图获取 RoboMaster 规则答疑，与上次发布的快照比较，再通过阿里云百炼的 `deepseek-v4.1-flash` 生成 Markdown 报告。报告按变化类型分组，包含模型生成的摘要和关键词，以及脚本从快照引用的提问和官方反馈原文。无效答疑集中列在报告末尾。
 
 答疑数据来自公开的官方共享视图。规则答复以官方原文为准。[RoboMaster27 官方答疑（轻流）](https://qingflow.com/appView/g79clgn1kk02/shareView/g79clh9dkk02?exWsId=1SdM5_PB-NwUtnyPn2b8)
@@ -70,4 +72,4 @@ if ($LASTEXITCODE -ne 0) { throw '报告生成失败' }
 
 ## 审核与发布
 
-默认分支运行成功且有变更时，工作流会通过 `automation/rmqa-publication` 创建或更新待审核 PR。PR 包含本轮报告和对应的完整快照。审核报告并合并 PR 后，`reports/` 中会新增报告，发布基线也会随同更新。若运行期间发布基线已经被更新，请基于新基线重新运行。
+默认分支运行成功且有变更时，工作流会通过 `automation/rmqa-publication` 创建或更新待审核 PR。合并 PR 会一并发布本轮报告、更新发布基线和 README 顶部的最新报告链接。若运行期间发布基线已经被更新，请基于新基线重新运行。

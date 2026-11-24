@@ -156,6 +156,7 @@ jobs:
         run: |
           import hashlib
           import os
+          import re
           from pathlib import Path
           from shutil import copyfile
 
@@ -169,8 +170,18 @@ jobs:
           if report.exists():
               report = report.with_stem(f"{date}-{os.environ['GITHUB_RUN_ID']}")
 
+          readme = Path("readme.md")
+          marker = "<!-- rmqa-latest-report -->"
+          link = f"**最新报告** [{date} 答疑报告]({report.as_posix()}) {marker}"
+          readme_text, count = re.subn(
+              rf"^.*{re.escape(marker)}$", link, readme.read_text(encoding="utf-8"), flags=re.MULTILINE
+          )
+          if count != 1:
+              raise SystemExit("README 必须包含且仅包含一处最新报告标记")
+
           copyfile("out/publication/snapshot/rmqa_2027_clean.json", baseline)
           copyfile(source, report)
+          readme.write_text(readme_text, encoding="utf-8")
           with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as outputs:
               print(f"report-path={report.as_posix()}", file=outputs)
 
@@ -183,10 +194,11 @@ jobs:
           title: 发布 RoboMaster 答疑报告（${{ needs.export.outputs.report-date }}）
           commit-message: 更新 RoboMaster 答疑报告与发布基线
           body: |
-            本 PR 提交本轮答疑报告和生成报告时对应的完整快照。
+            本 PR 提交本轮答疑报告和对应的完整快照，并更新 README 的最新报告链接。
             请审核报告内容，确认后合并以推进发布基线。
 
             工作流运行：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           add-paths: |
             data/rmqa_2027_published.json
             ${{ steps.publication.outputs.report-path }}
+            readme.md
