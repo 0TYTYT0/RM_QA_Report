@@ -32,6 +32,10 @@ def index_changes(changes):
             for field in ("competition", "question", "answer"):
                 if field not in record or (record[field] is not None and not isinstance(record[field], str)):
                     raise ValueError(f"编号 {record_id} 的 {field} 应为文本或 null")
+            for field in ("university", "team"):
+                value = record.get(field)
+                if value is not None and not isinstance(value, str):
+                    raise ValueError(f"编号 {record_id} 的 {field} 应为文本或 null")
             indexed[record_id] = (category, record)
     return indexed
 
@@ -178,6 +182,8 @@ def render_report(template, day, items, indexed):
         values = {
             "答疑编号": record_id,
             "赛事类型": record["competition"] or "未标注赛事",
+            "学校名": (record.get("university") or "").strip() or "未标注学校",
+            "战队名": (record.get("team") or "").strip() or "未标注战队",
             "一个或多个关键词": "、".join(item["keywords"]),
             "摘要正文": item["summary"],
             "提问原文": format_quoted_text(record["question"] or "（原始提问为空）"),
