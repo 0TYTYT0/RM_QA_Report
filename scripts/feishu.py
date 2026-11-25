@@ -31,12 +31,14 @@ class Feishu:
         return result
 
     def get_chats(self):
-        result = self.request(
-            "GET",
-            "/im/v1/chats",
-            params={"page_size": 100}
-        )
-        return result["data"]["items"]
+        params = {"page_size": 100}
+        chats = []
+        while True:
+            data = self.request("GET", "/im/v1/chats", params=params)["data"]
+            chats.extend(data.get("items") or [])
+            if not data["has_more"]:
+                return chats
+            params = {"page_size": 100, "page_token": data["page_token"]}
 
     def grant_document_admin(self, doc_id, open_id):
         return self.request(
@@ -185,13 +187,12 @@ class Feishu:
         )
 
     # 发布报告
-    def publish_report(self, chat_id, title, markdown):
+    def publish_report(self, chat_ids, title, markdown):
         admin_open_id = os.environ["FEISHU_ADMIN_OPEN_ID"]
         doc_domain = os.environ["DOC_DOMAIN"]
         doc_id = self.create_document(title, markdown)
 
         self.grant_document_admin(doc_id, admin_open_id)
-        self.grant_permission(doc_id, chat_id)
 
         url = f"{doc_domain}/docx/{doc_id}"
         question_ids = {
@@ -208,11 +209,20 @@ class Feishu:
                 id_range += f"–#{last_id}"
             notification += f"\n\n本次答疑编号范围：{id_range}（共 {len(question_ids)} 条）"
 
-        self.send_markdown(
-            chat_id,
-            title,
-            f"{notification}\n\n[查看完整报告]({url})"
-        )
+        message = f"{notification}\n\n[查看完整报告]({url})"
+        failures = []
+        for index, chat_id in enumerate(chat_ids, start=1):
+            try:
+                self.grant_permission(doc_id, chat_id)
+                self.send_markdown(chat_id, title, message)
+            except (RuntimeError, requests.RequestException) as error:
+                failures.append(f"第 {index} 个群：{error}")
+
+        if failures:
+            raise RuntimeError(
+                f"报告已写入飞书，{len(failures)} 个群发布失败：\n"
+                + "\n".join(failures)
+            )
 
         return url
 
@@ -240,10 +250,11 @@ def main():
     if not reports:
         return
 
-    chat_id = os.environ["FEISHU_CHAT_ID"]
     feishu = Feishu()
+    chat_ids = list(dict.fromkeys(chat["chat_id"] for chat in feishu.get_chats()))
+    print(f"找到 {len(chat_ids)} 个机器人所在群聊")
     for name, markdown in reports:
-        url = feishu.publish_report(chat_id, f"RoboMaster 答疑报告 {name}", markdown)
+        url = feishu.publish_report(chat_ids, f"RoboMaster 答疑报告 {name}", markdown)
         print(f"发布成功：{url}")
 
 

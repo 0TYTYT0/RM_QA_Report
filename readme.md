@@ -78,5 +78,7 @@ if ($LASTEXITCODE -ne 0) { throw '报告生成失败' }
 
 在仓库的 **Settings → Secrets and variables → Actions** 中配置以下值。
 
-- **Secrets** 中添加 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_FOLDER_TOKEN`、`FEISHU_ADMIN_OPEN_ID` 和 `FEISHU_CHAT_ID`。
+- **Secrets** 中添加 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_FOLDER_TOKEN` 和 `FEISHU_ADMIN_OPEN_ID`。
 - **Variables** 中添加 `DOC_DOMAIN`，填写飞书文档域名，例如 `https://example.feishu.cn`。
+
+机器人会分页获取自己加入的群聊，为每个群授予报告阅读权限后发送通知。飞书应用需开通获取群列表的权限。机器人没有加入任何群时，仍会创建云文档。
