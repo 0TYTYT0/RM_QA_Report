@@ -73,3 +73,10 @@ if ($LASTEXITCODE -ne 0) { throw '报告生成失败' }
 ## 审核与发布
 
 默认分支运行成功且有变更时，工作流会通过 `automation/rmqa-publication` 创建或更新待审核 PR。合并 PR 会一并发布本轮报告、更新发布基线和 README 顶部的最新报告链接。若运行期间发布基线已经被更新，请基于新基线重新运行。
+
+[发布答疑报告到飞书](.github/workflows/feishu-upload.yml) 在 PR 合并到默认分支后运行。自动生成和手动创建的 PR 使用相同规则。工作流读取合并提交中新增、修改或重命名后的报告，逐份创建飞书云文档并向配置的群聊发送链接。手动提交时，请将非空 UTF-8 Markdown 放在 `reports/YYYY-MM-DD.md`，同一天的多份报告可以使用 `reports/YYYY-MM-DD-数字.md`。
+
+在仓库的 **Settings → Secrets and variables → Actions** 中配置以下值。
+
+- **Secrets** 中添加 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_FOLDER_TOKEN`、`FEISHU_ADMIN_OPEN_ID` 和 `FEISHU_CHAT_ID`。
+- **Variables** 中添加 `DOC_DOMAIN`，填写飞书文档域名，例如 `https://example.feishu.cn`。
