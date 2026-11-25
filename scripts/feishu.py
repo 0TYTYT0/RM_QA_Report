@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 from datetime import date
 import requests
 from pathlib import Path
@@ -193,11 +194,24 @@ class Feishu:
         self.grant_permission(doc_id, chat_id)
 
         url = f"{doc_domain}/docx/{doc_id}"
+        question_ids = {
+            int(value)
+            for value in re.findall(
+                r"^###[ \t]+#([0-9]+)(?=[ \t]|\r?$)", markdown, re.MULTILINE
+            )
+        }
+        notification = "报告已发布。"
+        if question_ids:
+            first_id, last_id = min(question_ids), max(question_ids)
+            id_range = f"#{first_id}"
+            if first_id != last_id:
+                id_range += f"–#{last_id}"
+            notification += f"\n\n本次答疑编号范围：{id_range}（共 {len(question_ids)} 条）"
 
         self.send_markdown(
             chat_id,
             title,
-            f"报告已发布。\n\n[查看完整报告]({url})"
+            f"{notification}\n\n[查看完整报告]({url})"
         )
 
         return url
