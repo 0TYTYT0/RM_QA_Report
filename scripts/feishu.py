@@ -198,7 +198,7 @@ class Feishu:
         question_ids = {
             int(value)
             for value in re.findall(
-                r"^###[ \t]+#([0-9]+)(?=[ \t]|\r?$)", markdown, re.MULTILINE
+                r"^###[ \t]+(?:QA|#)([0-9]+)(?=[ \t]|\r?$)", markdown, re.MULTILINE
             )
         }
         notification = "报告已发布。"
